@@ -10,7 +10,7 @@
     <div class="col-md-6 col-lg-5">
         <div class="card">
             <div class="card-body">
-                <form asp-action="Create" method="post">
+                <form asp-action="Create" method="post" enctype="multipart/form-data">
                     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                     <div class="mb-3">
                         <label asp-for="Date" class="form-label"></label>
@@ -23,6 +23,13 @@
                             <option value="">-- เลือกหมวดหมู่ --</option>
                         </select>
                         <span asp-validation-for="CategoryId" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">สลิปโอนเงิน</label>
+                        <input type="file" name="slipFiles" id="slipFiles" class="form-control" accept="image/png,image/jpeg,image/webp" multiple />
+                        <div class="form-text">แนบได้หลายรูป ระบบจะพยายามอ่านจำนวนเงินจากรูปแรกให้อัตโนมัติ กรุณาตรวจสอบความถูกต้องก่อนบันทึก</div>
+                        <div id="scanStatus" class="form-text text-primary"></div>
+                        <div id="slipPreview" class="d-flex flex-wrap gap-2 mt-2"></div>
                     </div>
                     <div class="mb-3">
                         <label asp-for="Amount" class="form-label"></label>
@@ -47,4 +54,5 @@
 
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script src="~/js/slip-upload.js"></script>
 }

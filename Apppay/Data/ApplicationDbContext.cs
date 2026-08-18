@@ -13,6 +13,7 @@ namespace Apppay.Data
 
         public DbSet<Category> Categories => Set<Category>();
         public DbSet<Transaction> Transactions => Set<Transaction>();
+        public DbSet<TransactionSlip> TransactionSlips => Set<TransactionSlip>();
         public DbSet<LoginLog> LoginLogs => Set<LoginLog>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -43,6 +44,15 @@ namespace Apppay.Data
 
             modelBuilder.Entity<Transaction>()
                 .HasIndex(t => new { t.UserId, t.Date });
+
+            modelBuilder.Entity<TransactionSlip>()
+                .HasOne(s => s.Transaction)
+                .WithMany(t => t.Slips)
+                .HasForeignKey(s => s.TransactionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TransactionSlip>()
+                .HasIndex(s => s.TransactionId);
 
             modelBuilder.Entity<LoginLog>()
                 .HasOne(l => l.User)

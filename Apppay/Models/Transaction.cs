@@ -36,6 +36,8 @@ namespace Apppay.Models
 
         public ApplicationUser? User { get; set; }
 
+        public ICollection<TransactionSlip> Slips { get; set; } = new List<TransactionSlip>();
+
         [NotMapped]
         public TransactionType Type => Category?.Type ?? TransactionType.Expense;
     }

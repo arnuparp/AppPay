@@ -10,7 +10,7 @@
     <div class="col-md-6 col-lg-5">
         <div class="card">
             <div class="card-body">
-                <form asp-action="Edit" asp-route-id="@Model.Id" method="post">
+                <form asp-action="Edit" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data">
                     <input type="hidden" asp-for="Id" />
                     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                     <div class="mb-3">
@@ -22,6 +22,31 @@
                         <label asp-for="CategoryId" class="form-label"></label>
                         <select asp-for="CategoryId" class="form-select" asp-items="categories"></select>
                         <span asp-validation-for="CategoryId" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">สลิปโอนเงิน</label>
+                        @if (Model.Slips.Any())
+                        {
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                @foreach (var slip in Model.Slips.OrderByDescending(s => s.UploadedAt))
+                                {
+                                    <div class="position-relative">
+                                        <a asp-action="ViewSlip" asp-route-id="@slip.Id" target="_blank">
+                                            <img src="@Url.Action("ViewSlip", new { id = slip.Id })" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid #dee2e6;" />
+                                        </a>
+                                        <form asp-action="DeleteSlip" method="post" class="position-absolute top-0 end-0" onsubmit="return confirm('ลบรูปสลิปนี้?');">
+                                            <input type="hidden" name="id" value="@slip.Id" />
+                                            <input type="hidden" name="transactionId" value="@Model.Id" />
+                                            <button type="submit" class="btn btn-sm btn-danger rounded-circle p-0" style="width:20px;height:20px;line-height:1;transform:translate(30%,-30%);"><i class="bi bi-x" style="font-size:12px;"></i></button>
+                                        </form>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        <input type="file" name="slipFiles" id="slipFiles" class="form-control" accept="image/png,image/jpeg,image/webp" multiple />
+                        <div class="form-text">แนบเพิ่มได้หลายรูป ระบบจะพยายามอ่านจำนวนเงินจากรูปแรกให้อัตโนมัติถ้ายังไม่ได้กรอก</div>
+                        <div id="scanStatus" class="form-text text-primary"></div>
+                        <div id="slipPreview" class="d-flex flex-wrap gap-2 mt-2"></div>
                     </div>
                     <div class="mb-3">
                         <label asp-for="Amount" class="form-label"></label>
@@ -46,4 +71,5 @@
 
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script src="~/js/slip-upload.js"></script>
 }

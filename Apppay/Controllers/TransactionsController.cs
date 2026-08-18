@@ -1,5 +1,6 @@
 using Apppay.Data;
 using Apppay.Models;
+using Apppay.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -11,16 +12,26 @@ namespace Apppay.Controllers
     [Authorize]
     public class TransactionsController : Controller
     {
+        private const long MaxSlipFileSize = 10 * 1024 * 1024; // 10 MB ต่อรูป
+        private static readonly string[] AllowedSlipExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
+
         private readonly ApplicationDbContext _db;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IWebHostEnvironment _env;
+        private readonly SlipOcrService _ocr;
 
-        public TransactionsController(ApplicationDbContext db, UserManager<ApplicationUser> userManager)
+        public TransactionsController(ApplicationDbContext db, UserManager<ApplicationUser> userManager, IWebHostEnvironment env, SlipOcrService ocr)
         {
             _db = db;
             _userManager = userManager;
+            _env = env;
+            _ocr = ocr;
         }
 
         private string CurrentUserId => _userManager.GetUserId(User)!;
+
+        // เก็บนอก wwwroot เพราะสลิปเป็นข้อมูลการเงินที่ sensitive — ต้องเสิร์ฟผ่าน action ที่เช็คสิทธิ์เท่านั้น ห้ามให้ static file server เข้าถึงตรงๆ
+        private string SlipsRootPath => Path.Combine(_env.ContentRootPath, "App_Data", "slips");
 
         public async Task<IActionResult> Index(int? year, int? month)
         {
@@ -28,6 +39,7 @@ namespace Apppay.Controllers
 
             var baseQuery = _db.Transactions
                 .Include(t => t.Category)
+                .Include(t => t.Slips)
                 .Where(t => t.UserId == userId);
 
             var availableYears = await baseQuery
@@ -108,7 +120,7 @@ namespace Apppay.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Transaction transaction)
+        public async Task<IActionResult> Create(Transaction transaction, List<IFormFile>? slipFiles)
         {
             ModelState.Remove(nameof(Transaction.UserId));
             ModelState.Remove(nameof(Transaction.Category));
@@ -128,13 +140,18 @@ namespace Apppay.Controllers
 
             _db.Transactions.Add(transaction);
             await _db.SaveChangesAsync();
+
+            await SaveSlipFilesAsync(transaction.Id, slipFiles);
+
             TempData["Success"] = "บันทึกรายการเรียบร้อยแล้ว";
             return RedirectToAction(nameof(Index), new { year = transaction.Date.Year, month = transaction.Date.Month });
         }
 
         public async Task<IActionResult> Edit(int id)
         {
-            var transaction = await _db.Transactions.FirstOrDefaultAsync(t => t.Id == id && t.UserId == CurrentUserId);
+            var transaction = await _db.Transactions
+                .Include(t => t.Slips)
+                .FirstOrDefaultAsync(t => t.Id == id && t.UserId == CurrentUserId);
             if (transaction == null) return NotFound();
 
             await PopulateCategoriesAsync();
@@ -143,7 +160,7 @@ namespace Apppay.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, Transaction transaction)
+        public async Task<IActionResult> Edit(int id, Transaction transaction, List<IFormFile>? slipFiles)
         {
             if (id != transaction.Id) return NotFound();
 
@@ -156,6 +173,8 @@ namespace Apppay.Controllers
 
             if (!ModelState.IsValid)
             {
+                var existingForView = await _db.Transactions.Include(t => t.Slips).FirstOrDefaultAsync(t => t.Id == id && t.UserId == CurrentUserId);
+                transaction.Slips = existingForView?.Slips ?? new List<TransactionSlip>();
                 await PopulateCategoriesAsync();
                 return View(transaction);
             }
@@ -169,8 +188,100 @@ namespace Apppay.Controllers
             existing.Note = transaction.Note;
 
             await _db.SaveChangesAsync();
+
+            await SaveSlipFilesAsync(existing.Id, slipFiles);
+
             TempData["Success"] = "แก้ไขรายการเรียบร้อยแล้ว";
             return RedirectToAction(nameof(Index), new { year = existing.Date.Year, month = existing.Date.Month });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteSlip(int id, int transactionId)
+        {
+            var slip = await _db.TransactionSlips
+                .Include(s => s.Transaction)
+                .FirstOrDefaultAsync(s => s.Id == id && s.Transaction!.UserId == CurrentUserId);
+            if (slip == null) return NotFound();
+
+            var filePath = Path.Combine(SlipsRootPath, CurrentUserId, slip.TransactionId.ToString(), slip.FileName);
+            if (System.IO.File.Exists(filePath))
+                System.IO.File.Delete(filePath);
+
+            _db.TransactionSlips.Remove(slip);
+            await _db.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Edit), new { id = transactionId });
+        }
+
+        public async Task<IActionResult> ViewSlip(int id)
+        {
+            var slip = await _db.TransactionSlips
+                .Include(s => s.Transaction)
+                .FirstOrDefaultAsync(s => s.Id == id && s.Transaction!.UserId == CurrentUserId);
+            if (slip == null) return NotFound();
+
+            var filePath = Path.Combine(SlipsRootPath, CurrentUserId, slip.TransactionId.ToString(), slip.FileName);
+            if (!System.IO.File.Exists(filePath)) return NotFound();
+
+            var contentType = Path.GetExtension(filePath).ToLowerInvariant() switch
+            {
+                ".png" => "image/png",
+                ".webp" => "image/webp",
+                _ => "image/jpeg"
+            };
+
+            return PhysicalFile(filePath, contentType);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ScanSlip(IFormFile? file)
+        {
+            if (file == null || file.Length == 0 || file.Length > MaxSlipFileSize)
+                return Json(new { amount = (decimal?)null });
+
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!AllowedSlipExtensions.Contains(ext))
+                return Json(new { amount = (decimal?)null });
+
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms);
+            var amount = _ocr.TryReadAmount(ms.ToArray());
+            return Json(new { amount });
+        }
+
+        private async Task SaveSlipFilesAsync(int transactionId, List<IFormFile>? files)
+        {
+            if (files == null || files.Count == 0) return;
+
+            var folder = Path.Combine(SlipsRootPath, CurrentUserId, transactionId.ToString());
+            Directory.CreateDirectory(folder);
+
+            foreach (var file in files)
+            {
+                if (file.Length == 0 || file.Length > MaxSlipFileSize) continue;
+
+                var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+                if (!AllowedSlipExtensions.Contains(ext)) continue;
+
+                var storedName = $"{Guid.NewGuid()}{ext}";
+                var fullPath = Path.Combine(folder, storedName);
+
+                using (var stream = new FileStream(fullPath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                _db.TransactionSlips.Add(new TransactionSlip
+                {
+                    TransactionId = transactionId,
+                    FileName = storedName,
+                    OriginalFileName = Path.GetFileName(file.FileName)
+                });
+            }
+
+            await _db.SaveChangesAsync();
         }
 
         public async Task<IActionResult> Delete(int id)
@@ -195,6 +306,11 @@ namespace Apppay.Controllers
 
             _db.Transactions.Remove(transaction);
             await _db.SaveChangesAsync();
+
+            var folder = Path.Combine(SlipsRootPath, CurrentUserId, id.ToString());
+            if (Directory.Exists(folder))
+                Directory.Delete(folder, recursive: true);
+
             TempData["Success"] = "ลบรายการเรียบร้อยแล้ว";
             return RedirectToAction(nameof(Index), new { year, month });
         }

@@ -143,6 +143,14 @@
                             @(isIncome ? "+" : "-")@t.Amount.ToString("N2")
                         </td>
                         <td class="text-end">
+                            @if (t.Slips.Any())
+                            {
+                                var slipUrls = t.Slips.OrderByDescending(s => s.UploadedAt).Select(s => Url.Action("ViewSlip", new { id = s.Id }));
+                                <button type="button" class="btn btn-sm btn-outline-secondary border-0" data-bs-toggle="modal" data-bs-target="#slipModal"
+                                        data-images="@string.Join(",", slipUrls)" title="ดูสลิป (@t.Slips.Count)">
+                                    <i class="bi bi-paperclip"></i>@t.Slips.Count
+                                </button>
+                            }
                             <a asp-action="Edit" asp-route-id="@t.Id" class="btn btn-sm btn-outline-secondary border-0"><i class="bi bi-pencil-square"></i></a>
                             <a asp-action="Delete" asp-route-id="@t.Id" class="btn btn-sm btn-outline-danger border-0"><i class="bi bi-trash3"></i></a>
                         </td>
@@ -153,7 +161,37 @@
     </div>
 </div>
 
+<div class="modal fade" id="slipModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="bi bi-paperclip me-1"></i>สลิปโอนเงิน</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body d-flex flex-wrap gap-2" id="slipModalBody"></div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
+    <script>
+        document.getElementById('slipModal').addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var urls = (button.getAttribute('data-images') || '').split(',').filter(Boolean);
+            var body = document.getElementById('slipModalBody');
+            body.innerHTML = '';
+            urls.forEach(function (url) {
+                var a = document.createElement('a');
+                a.href = url;
+                a.target = '_blank';
+                var img = document.createElement('img');
+                img.src = url;
+                img.style.cssText = 'width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #dee2e6;';
+                a.appendChild(img);
+                body.appendChild(a);
+            });
+        });
+    </script>
     @if (Model.Transactions.Any())
     {
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>

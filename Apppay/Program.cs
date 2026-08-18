@@ -31,6 +31,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 
 builder.Services.AddScoped<DefaultCategorySeeder>();
+builder.Services.AddSingleton<SlipOcrService>();
 
 var app = builder.Build();
 
