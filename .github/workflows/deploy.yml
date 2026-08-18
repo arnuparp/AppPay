@@ -24,8 +24,9 @@ env:
 jobs:
   deploy:
     name: Build & Deploy
-    # ป้าย label ที่เราตั้งตอน config runner บน VPS
-    runs-on: [self-hosted, windows, apppay]
+    # label พื้นฐานที่ runner ทุกตัวบน Windows มีให้อัตโนมัติ
+    # วันที่มี VPS หลายเครื่อง ค่อยเติม label เฉพาะเจาะจงกลับเข้ามา
+    runs-on: [self-hosted, windows]
     timeout-minutes: 20
 
     steps:
