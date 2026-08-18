@@ -19,13 +19,15 @@ namespace Apppay.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IWebHostEnvironment _env;
         private readonly SlipOcrService _ocr;
+        private readonly ILogger<TransactionsController> _logger;
 
-        public TransactionsController(ApplicationDbContext db, UserManager<ApplicationUser> userManager, IWebHostEnvironment env, SlipOcrService ocr)
+        public TransactionsController(ApplicationDbContext db, UserManager<ApplicationUser> userManager, IWebHostEnvironment env, SlipOcrService ocr, ILogger<TransactionsController> logger)
         {
             _db = db;
             _userManager = userManager;
             _env = env;
             _ocr = ocr;
+            _logger = logger;
         }
 
         private string CurrentUserId => _userManager.GetUserId(User)!;
@@ -141,9 +143,11 @@ namespace Apppay.Controllers
             _db.Transactions.Add(transaction);
             await _db.SaveChangesAsync();
 
-            await SaveSlipFilesAsync(transaction.Id, slipFiles);
+            var slipsSaved = await SaveSlipFilesAsync(transaction.Id, slipFiles);
 
-            TempData["Success"] = "บันทึกรายการเรียบร้อยแล้ว";
+            TempData["Success"] = slipsSaved
+                ? "บันทึกรายการเรียบร้อยแล้ว"
+                : "บันทึกรายการเรียบร้อยแล้ว แต่แนบไฟล์สลิปไม่สำเร็จ กรุณาลองแนบใหม่ในหน้าแก้ไขรายการ";
             return RedirectToAction(nameof(Index), new { year = transaction.Date.Year, month = transaction.Date.Month });
         }
 
@@ -189,9 +193,11 @@ namespace Apppay.Controllers
 
             await _db.SaveChangesAsync();
 
-            await SaveSlipFilesAsync(existing.Id, slipFiles);
+            var slipsSaved = await SaveSlipFilesAsync(existing.Id, slipFiles);
 
-            TempData["Success"] = "แก้ไขรายการเรียบร้อยแล้ว";
+            TempData["Success"] = slipsSaved
+                ? "แก้ไขรายการเรียบร้อยแล้ว"
+                : "แก้ไขรายการเรียบร้อยแล้ว แต่แนบไฟล์สลิปไม่สำเร็จ กรุณาลองแนบใหม่";
             return RedirectToAction(nameof(Index), new { year = existing.Date.Year, month = existing.Date.Month });
         }
 
@@ -284,37 +290,50 @@ namespace Apppay.Controllers
             return Json(new { amounts, total });
         }
 
-        private async Task SaveSlipFilesAsync(int transactionId, List<IFormFile>? files)
+        // คืนค่า false ถ้าแนบไฟล์ไม่สำเร็จ (รายการหลักถูกบันทึกไปแล้วก่อนเรียกเมธอดนี้ จึงไม่ให้ล้มทั้งคำขอ)
+        private async Task<bool> SaveSlipFilesAsync(int transactionId, List<IFormFile>? files)
         {
-            if (files == null || files.Count == 0) return;
+            if (files == null || files.Count == 0) return true;
 
-            var folder = Path.Combine(SlipsRootPath, CurrentUserId, transactionId.ToString());
-            Directory.CreateDirectory(folder);
-
-            foreach (var file in files)
+            try
             {
-                if (file.Length == 0 || file.Length > MaxSlipFileSize) continue;
+                var folder = Path.Combine(SlipsRootPath, CurrentUserId, transactionId.ToString());
+                Directory.CreateDirectory(folder);
 
-                var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-                if (!AllowedSlipExtensions.Contains(ext)) continue;
-
-                var storedName = $"{Guid.NewGuid()}{ext}";
-                var fullPath = Path.Combine(folder, storedName);
-
-                using (var stream = new FileStream(fullPath, FileMode.Create))
+                foreach (var file in files)
                 {
-                    await file.CopyToAsync(stream);
+                    if (file.Length == 0 || file.Length > MaxSlipFileSize) continue;
+
+                    var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+                    if (!AllowedSlipExtensions.Contains(ext)) continue;
+
+                    var storedName = $"{Guid.NewGuid()}{ext}";
+                    var fullPath = Path.Combine(folder, storedName);
+
+                    using (var stream = new FileStream(fullPath, FileMode.Create))
+                    {
+                        await file.CopyToAsync(stream);
+                    }
+
+                    var originalName = Path.GetFileName(file.FileName);
+                    if (originalName.Length > 260) originalName = originalName[^260..];
+
+                    _db.TransactionSlips.Add(new TransactionSlip
+                    {
+                        TransactionId = transactionId,
+                        FileName = storedName,
+                        OriginalFileName = originalName
+                    });
                 }
 
-                _db.TransactionSlips.Add(new TransactionSlip
-                {
-                    TransactionId = transactionId,
-                    FileName = storedName,
-                    OriginalFileName = Path.GetFileName(file.FileName)
-                });
+                await _db.SaveChangesAsync();
+                return true;
             }
-
-            await _db.SaveChangesAsync();
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "แนบไฟล์สลิปไม่สำเร็จสำหรับ Transaction {TransactionId}", transactionId);
+                return false;
+            }
         }
 
         public async Task<IActionResult> Delete(int id)
