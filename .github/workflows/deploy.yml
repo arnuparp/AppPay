@@ -65,8 +65,8 @@ jobs:
       - name: Summary
         if: always()
         shell: powershell
+        # ASCII only: Windows PowerShell 5.1 reads BOM-less scripts as ANSI
         run: |
-          $status = if ('${{ job.status }}' -eq 'success') { 'สำเร็จ' } else { 'ล้มเหลว' }
-          $text = "## Deploy $status`n`n- commit: ${{ github.sha }}`n- โดย: ${{ github.actor }}`n- เวลา: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`n"
-          # เขียนเป็น UTF-8 ไม่มี BOM — Windows PowerShell 5.1 ใส่ BOM ให้เองถ้าใช้ Out-File
+          $status = '${{ job.status }}'
+          $text = "## Deploy $status`n`n- commit: ${{ github.sha }}`n- actor: ${{ github.actor }}`n- time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`n"
           [System.IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, $text, (New-Object System.Text.UTF8Encoding($false)))
