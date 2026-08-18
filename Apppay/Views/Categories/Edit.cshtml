@@ -1,0 +1,38 @@
+@model Apppay.Models.Category
+@{
+    ViewData["Title"] = "แก้ไขหมวดหมู่";
+}
+
+<h3 class="page-heading mb-4"><i class="bi bi-pencil-square me-1"></i>แก้ไขหมวดหมู่</h3>
+
+<div class="row">
+    <div class="col-md-6 col-lg-5">
+        <div class="card">
+            <div class="card-body">
+                <form asp-action="Edit" asp-route-id="@Model.Id" method="post">
+                    <input type="hidden" asp-for="Id" />
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                    <div class="mb-3">
+                        <label asp-for="Name" class="form-label"></label>
+                        <input asp-for="Name" class="form-control" />
+                        <span asp-validation-for="Name" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Type" class="form-label"></label>
+                        <select asp-for="Type" class="form-select" asp-items="Html.GetEnumSelectList<Apppay.Models.TransactionType>()"></select>
+                    </div>
+                    <div class="mb-4">
+                        <label asp-for="Color" class="form-label"></label>
+                        <input asp-for="Color" type="color" class="form-control form-control-color" />
+                    </div>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4"><i class="bi bi-check-lg me-1"></i>บันทึก</button>
+                    <a asp-action="Index" class="btn btn-light rounded-pill px-4">ยกเลิก</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

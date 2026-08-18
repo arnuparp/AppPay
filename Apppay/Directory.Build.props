@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>obj-v2\</BaseIntermediateOutputPath>
+    <BaseOutputPath>bin-v2\</BaseOutputPath>
+  </PropertyGroup>
+</Project>

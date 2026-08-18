@@ -1,0 +1,41 @@
+@model Apppay.Models.Category
+@{
+    ViewData["Title"] = "ลบหมวดหมู่";
+}
+
+<h3 class="page-heading mb-4"><i class="bi bi-trash3 me-1"></i>ลบหมวดหมู่</h3>
+
+<div class="row">
+    <div class="col-md-6 col-lg-5">
+        <div class="card">
+            <div class="card-body">
+                <div class="alert alert-warning d-flex align-items-center gap-2 border-0 rounded-3">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <div>คุณแน่ใจหรือไม่ว่าต้องการลบหมวดหมู่นี้?</div>
+                </div>
+                <dl class="row mb-4">
+                    <dt class="col-sm-4 text-muted fw-normal">ชื่อ</dt>
+                    <dd class="col-sm-8"><span class="cat-dot me-1" style="background-color:@Model.Color"></span>@Model.Name</dd>
+                    <dt class="col-sm-4 text-muted fw-normal">ประเภท</dt>
+                    <dd class="col-sm-8">@(Model.Type == Apppay.Models.TransactionType.Income ? "รายรับ" : "รายจ่าย")</dd>
+                </dl>
+
+                @if (Model.HasTransactions)
+                {
+                    <div class="alert alert-danger d-flex align-items-center gap-2 border-0 rounded-3">
+                        <i class="bi bi-x-circle-fill"></i>
+                        <div>ไม่สามารถลบได้ เนื่องจากมีรายการที่ใช้งานหมวดหมู่นี้อยู่</div>
+                    </div>
+                    <a asp-action="Index" class="btn btn-light rounded-pill px-4">กลับ</a>
+                }
+                else
+                {
+                    <form asp-action="Delete" asp-route-id="@Model.Id" method="post">
+                        <button type="submit" class="btn btn-danger rounded-pill px-4"><i class="bi bi-trash3 me-1"></i>ยืนยันการลบ</button>
+                        <a asp-action="Index" class="btn btn-light rounded-pill px-4">ยกเลิก</a>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+</div>

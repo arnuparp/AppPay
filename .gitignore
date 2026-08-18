@@ -1,0 +1,24 @@
+## .NET
+[Bb]in/
+[Oo]bj/
+bin-v2/
+obj-v2/
+[Dd]ebug/
+[Rr]elease/
+publish/
+*.user
+*.suo
+*.userprefs
+
+## Visual Studio
+.vs/
+.idea/
+
+## OS
+Thumbs.db
+.DS_Store
+
+## Secrets — ห้ามขึ้น git เด็ดขาด
+appsettings.Production.json
+appsettings.*.Local.json
+*.pfx

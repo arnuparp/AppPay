@@ -1,0 +1,11 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=localhost,1433;Database=PayDB;User Id=apppay;Password=__CHANGE_ME__;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Warning",
+      "Apppay": "Information"
+    }
+  }
+}

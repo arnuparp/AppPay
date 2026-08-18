@@ -1,0 +1,70 @@
+name: Deploy Apppay to VPS
+
+# 1) push เข้า main = deploy อัตโนมัติ
+# 2) กดปุ่ม Run workflow เองก็ได้ (เช่นตอนอยาก re-deploy / rollback)
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+# กัน deploy ซ้อนกัน: ถ้ามี run ค้างอยู่ให้รอคิว ไม่ใช่วิ่งพร้อมกัน
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  PUBLISH_DIR: ${{ github.workspace }}\publish
+  TARGET_DIR: 'C:\inetpub\apppay'
+  HEALTH_URL: 'http://localhost/'
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    # ป้าย label ที่เราตั้งตอน config runner บน VPS
+    runs-on: [self-hosted, windows, apppay]
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore Apppay.sln
+
+      - name: Build
+        run: dotnet build Apppay.sln -c Release --no-restore
+
+      # ถ้ามีเทสต์ค่อยเปิดบรรทัดนี้
+      # - name: Test
+      #   run: dotnet test Apppay.sln -c Release --no-build
+
+      - name: Publish
+        run: >
+          dotnet publish Apppay/Apppay.csproj
+          -c Release
+          -o "${{ env.PUBLISH_DIR }}"
+
+      - name: Deploy to IIS
+        shell: pwsh
+        run: >
+          .\deploy\deploy.ps1
+          -Source "${{ env.PUBLISH_DIR }}"
+          -Target "${{ env.TARGET_DIR }}"
+          -HealthUrl "${{ env.HEALTH_URL }}"
+
+      - name: Summary
+        if: always()
+        shell: pwsh
+        run: |
+          $status = if ('${{ job.status }}' -eq 'success') { 'สำเร็จ' } else { 'ล้มเหลว' }
+          "## Deploy $status`n`n- commit: ${{ github.sha }}`n- โดย: ${{ github.actor }}`n- เวลา: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

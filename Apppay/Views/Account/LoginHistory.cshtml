@@ -1,0 +1,55 @@
+@model List<Apppay.Models.LoginLog>
+@{
+    ViewData["Title"] = "ประวัติการเข้าสู่ระบบ";
+}
+
+<div class="mb-4">
+    <h3 class="page-heading mb-0"><i class="bi bi-clock-history me-1"></i>ประวัติการเข้าสู่ระบบ</h3>
+    <div class="subtitle">แสดง 100 รายการล่าสุดของบัญชีคุณ</div>
+</div>
+
+<div class="table-card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>วันที่ - เวลา</th>
+                    <th>สถานะ</th>
+                    <th>IP Address</th>
+                    <th>อุปกรณ์ / เบราว์เซอร์</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state">
+                                <div class="empty-icon"><i class="bi bi-clock-history"></i></div>
+                                <div>ยังไม่มีประวัติการเข้าสู่ระบบ</div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @foreach (var log in Model)
+                {
+                    <tr>
+                        <td>@log.LoginAt.ToString("dd/MM/") @(log.LoginAt.Year + 543) @log.LoginAt.ToString("HH:mm:ss")</td>
+                        <td>
+                            @if (log.Success)
+                            {
+                                <span class="badge type-income rounded-pill"><i class="bi bi-check-circle me-1"></i>สำเร็จ</span>
+                            }
+                            else
+                            {
+                                <span class="badge type-expense rounded-pill" title="@log.FailureReason"><i class="bi bi-x-circle me-1"></i>ไม่สำเร็จ</span>
+                            }
+                        </td>
+                        <td class="text-muted">@(log.IpAddress ?? "-")</td>
+                        <td class="text-muted text-truncate d-inline-block" style="max-width:320px" title="@log.UserAgent">@(log.UserAgent ?? "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

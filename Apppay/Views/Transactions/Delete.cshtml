@@ -1,0 +1,46 @@
+@model Apppay.Models.Transaction
+@{
+    ViewData["Title"] = "ลบรายการ";
+    var isIncome = Model.Category!.Type == Apppay.Models.TransactionType.Income;
+}
+
+<h3 class="page-heading mb-4"><i class="bi bi-trash3 me-1"></i>ลบรายการ</h3>
+
+<div class="row">
+    <div class="col-md-6 col-lg-5">
+        <div class="card">
+            <div class="card-body">
+                <div class="alert alert-warning d-flex align-items-center gap-2 border-0 rounded-3">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <div>คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้?</div>
+                </div>
+                <dl class="row mb-4">
+                    <dt class="col-sm-4 text-muted fw-normal">วันที่</dt>
+                    <dd class="col-sm-8">@Model.Date.ToString("dd/MM/") @(Model.Date.Year + 543)</dd>
+                    <dt class="col-sm-4 text-muted fw-normal">ประเภท</dt>
+                    <dd class="col-sm-8">
+                        @if (isIncome)
+                        {
+                            <span class="badge type-income rounded-pill">รายรับ</span>
+                        }
+                        else
+                        {
+                            <span class="badge type-expense rounded-pill">รายจ่าย</span>
+                        }
+                    </dd>
+                    <dt class="col-sm-4 text-muted fw-normal">หมวดหมู่</dt>
+                    <dd class="col-sm-8"><span class="cat-dot me-1" style="background-color:@Model.Category.Color"></span>@Model.Category.Name</dd>
+                    <dt class="col-sm-4 text-muted fw-normal">จำนวนเงิน</dt>
+                    <dd class="col-sm-8 fw-semibold">@Model.Amount.ToString("N2") บาท</dd>
+                    <dt class="col-sm-4 text-muted fw-normal">รายละเอียด</dt>
+                    <dd class="col-sm-8">@Model.Note</dd>
+                </dl>
+
+                <form asp-action="Delete" asp-route-id="@Model.Id" method="post">
+                    <button type="submit" class="btn btn-danger rounded-pill px-4"><i class="bi bi-trash3 me-1"></i>ยืนยันการลบ</button>
+                    <a asp-action="Index" class="btn btn-light rounded-pill px-4">ยกเลิก</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,188 @@
+@model Apppay.Models.TransactionsIndexViewModel
+@{
+    ViewData["Title"] = "รายงานสรุป";
+    var thaiMonths = new[] { "", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม" };
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h3 class="page-heading mb-0">รายงานสรุป</h3>
+        <div class="subtitle">ภาพรวมรายรับ-รายจ่ายของคุณ</div>
+    </div>
+    <a asp-action="Create" class="btn btn-primary rounded-pill"><i class="bi bi-plus-lg me-1"></i>เพิ่มรายการ</a>
+</div>
+
+<form method="get" asp-action="Index" class="row g-2 mb-4 align-items-end">
+    <div class="col-auto">
+        <label class="form-label mb-1"><i class="bi bi-calendar3 me-1"></i>ปี</label>
+        <select name="year" class="form-select" onchange="this.form.submit()">
+            @foreach (var y in Model.AvailableYears)
+            {
+                <option value="@y" selected="@(y == Model.Year)">@(y + 543)</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label mb-1">เดือน</label>
+        <select name="month" class="form-select" onchange="this.form.submit()">
+            <option value="" selected="@(Model.Month == null)">ทั้งปี</option>
+            @for (int m = 1; m <= 12; m++)
+            {
+                <option value="@m" selected="@(m == Model.Month)">@thaiMonths[m]</option>
+            }
+        </select>
+    </div>
+</form>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card stat-card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="stat-icon income"><i class="bi bi-arrow-down-circle-fill"></i></div>
+                <div>
+                    <div class="text-muted small">รายรับรวม</div>
+                    <div class="stat-value" style="color:var(--income)">@Model.TotalIncome.ToString("N2")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="stat-icon expense"><i class="bi bi-arrow-up-circle-fill"></i></div>
+                <div>
+                    <div class="text-muted small">รายจ่ายรวม</div>
+                    <div class="stat-value" style="color:var(--expense)">@Model.TotalExpense.ToString("N2")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="stat-icon balance"><i class="bi bi-piggy-bank-fill"></i></div>
+                <div>
+                    <div class="text-muted small">คงเหลือ</div>
+                    <div class="stat-value" style="color:@(Model.Balance >= 0 ? "var(--brand-1)" : "var(--expense)")">@Model.Balance.ToString("N2")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (Model.Transactions.Any())
+{
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="text-center mb-3"><i class="bi bi-pie-chart-fill me-1" style="color:var(--income)"></i>สัดส่วนรายรับตามหมวดหมู่</h6>
+                    <canvas id="incomeChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="text-center mb-3"><i class="bi bi-pie-chart-fill me-1" style="color:var(--expense)"></i>สัดส่วนรายจ่ายตามหมวดหมู่</h6>
+                    <canvas id="expenseChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<h5 class="page-heading mb-3"><i class="bi bi-list-ul me-1"></i>รายการทั้งหมด</h5>
+<div class="table-card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>วันที่</th>
+                    <th>ประเภท</th>
+                    <th>หมวดหมู่</th>
+                    <th>รายละเอียด</th>
+                    <th class="text-end">จำนวนเงิน</th>
+                    <th class="text-end">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Transactions.Any())
+                {
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+                                <div>ไม่มีรายการในช่วงเวลาที่เลือก</div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @foreach (var t in Model.Transactions)
+                {
+                    var isIncome = t.Category!.Type == Apppay.Models.TransactionType.Income;
+                    <tr>
+                        <td>@t.Date.ToString("dd/MM/") @(t.Date.Year + 543)</td>
+                        <td>
+                            @if (isIncome)
+                            {
+                                <span class="badge type-income rounded-pill"><i class="bi bi-arrow-down-circle me-1"></i>รายรับ</span>
+                            }
+                            else
+                            {
+                                <span class="badge type-expense rounded-pill"><i class="bi bi-arrow-up-circle me-1"></i>รายจ่าย</span>
+                            }
+                        </td>
+                        <td>
+                            <span class="cat-dot me-1" style="background-color:@t.Category.Color"></span>
+                            @t.Category.Name
+                        </td>
+                        <td class="text-muted">@t.Note</td>
+                        <td class="text-end @(isIncome ? "amount-income" : "amount-expense")">
+                            @(isIncome ? "+" : "-")@t.Amount.ToString("N2")
+                        </td>
+                        <td class="text-end">
+                            <a asp-action="Edit" asp-route-id="@t.Id" class="btn btn-sm btn-outline-secondary border-0"><i class="bi bi-pencil-square"></i></a>
+                            <a asp-action="Delete" asp-route-id="@t.Id" class="btn btn-sm btn-outline-danger border-0"><i class="bi bi-trash3"></i></a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    @if (Model.Transactions.Any())
+    {
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+        <script>
+            const incomeData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.IncomeByCategory, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+            const expenseData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ExpenseByCategory, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+
+            Chart.defaults.font.family = "Kanit, sans-serif";
+
+            function renderPie(canvasId, data) {
+                const ctx = document.getElementById(canvasId);
+                if (!ctx || !data.length) return;
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.map(d => d.name),
+                        datasets: [{
+                            data: data.map(d => d.total),
+                            backgroundColor: data.map(d => d.color),
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                });
+            }
+
+            renderPie('incomeChart', incomeData);
+            renderPie('expenseChart', expenseData);
+        </script>
+    }
+}
