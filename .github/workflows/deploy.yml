@@ -55,7 +55,7 @@ jobs:
           -o "${{ env.PUBLISH_DIR }}"
 
       - name: Deploy to IIS
-        shell: pwsh
+        shell: powershell
         run: >
           .\deploy\deploy.ps1
           -Source "${{ env.PUBLISH_DIR }}"
@@ -64,8 +64,9 @@ jobs:
 
       - name: Summary
         if: always()
-        shell: pwsh
+        shell: powershell
         run: |
           $status = if ('${{ job.status }}' -eq 'success') { 'สำเร็จ' } else { 'ล้มเหลว' }
-          "## Deploy $status`n`n- commit: ${{ github.sha }}`n- โดย: ${{ github.actor }}`n- เวลา: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" |
-            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          $text = "## Deploy $status`n`n- commit: ${{ github.sha }}`n- โดย: ${{ github.actor }}`n- เวลา: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`n"
+          # เขียนเป็น UTF-8 ไม่มี BOM — Windows PowerShell 5.1 ใส่ BOM ให้เองถ้าใช้ Out-File
+          [System.IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, $text, (New-Object System.Text.UTF8Encoding($false)))
