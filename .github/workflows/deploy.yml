@@ -33,10 +33,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET ${{ env.DOTNET_VERSION }}
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+      # ไม่ใช้ actions/setup-dotnet เพราะ VPS ลง .NET 9 SDK ไว้ในเครื่องแล้ว
+      # (action ตัวนั้นจะพยายามติดตั้งซ้ำลง C:\Program Files\dotnet ซึ่ง NETWORK SERVICE เขียนไม่ได้)
+      - name: Check .NET SDK
+        run: dotnet --version
 
       - name: Restore
         run: dotnet restore Apppay.sln
