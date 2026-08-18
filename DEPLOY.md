@@ -38,15 +38,13 @@ git push  ───────────────────────�
 
 ## 1. เตรียมโค้ดฝั่งเรา (ทำบนเครื่องตัวเอง)
 
-### 1.1 เอา secret ออกจาก repo ก่อน — ทำก่อน commit แรก
+### 1.1 แยก secret ออกจาก repo — *ยังไม่ต้องทำตอนนี้ ทำตอนขึ้นใช้จริง*
 
-`appsettings.json` เดิมมีแบบนี้ ซึ่ง **ห้ามขึ้น GitHub**:
+ตอนนี้ยังเป็นช่วงเทสต์ connection string เลยยังอยู่ใน `appsettings.json` ตามเดิม ใช้งานได้ปกติ ข้ามข้อนี้ไปข้อ 1.2 ได้เลย
 
-```json
-"DefaultConnection": "Server=165.101.65.249,1433;...;User Id=sa;Password=Master@Nan09;..."
-```
+ส่วนด้านล่างนี้คือสิ่งที่ต้องทำ **วันที่ระบบเริ่มมีข้อมูลจริง** — pipeline ที่เหลือรองรับไว้ให้แล้ว (`.gitignore` กันไฟล์ Production ไว้ และ `deploy.ps1` มี `/XF` ไม่ทับไฟล์นั้นบน server) เปลี่ยนวันไหนก็ไม่ต้องแก้ workflow
 
-ผมแก้เป็นค่าว่างให้แล้ว — ค่าจริงย้ายไปอยู่ 2 ที่แทน:
+ค่าจริงจะย้ายไปอยู่ 2 ที่:
 
 | ที่เก็บ | ใช้ตอน | ทำไมปลอดภัย |
 |---|---|---|
@@ -63,7 +61,7 @@ dotnet user-secrets init
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost;Database=PayDB_Dev;Trusted_Connection=True;TrustServerCertificate=True;"
 ```
 
-> **สำคัญ:** รหัส `Master@Nan09` ถือว่ารั่วแล้ว (เคยนอนอยู่ในไฟล์ธรรมดา) — เปลี่ยนรหัส `sa` ใหม่ และสร้าง login แยกให้แอปตามข้อ 3.2
+แล้วเปลี่ยน `appsettings.json` ในโค้ดให้ `"DefaultConnection": ""` (ค่าจริงมาจาก 2 ที่ข้างบนแทน)
 
 ### 1.2 เรื่อง HTTPS ต้องตัดสินใจตอนนี้
 
@@ -181,6 +179,9 @@ icacls "C:\inetpub\apppay\logs" /grant "IIS AppPool\apppay:(OI)(CI)M" /T
 ---
 
 ## 3. Config production + ล็อกดาวน์ฐานข้อมูล
+
+> **ช่วงเทสต์ข้ามทั้งข้อ 3 ได้** — connection string ยังอยู่ใน `appsettings.json` ที่ deploy ไปพร้อมโค้ด แอปทำงานได้เลย
+> ทำข้อนี้ตอนระบบเริ่มมีข้อมูลจริง
 
 ### 3.1 วางไฟล์ config จริงบน VPS (ครั้งเดียว ไม่เกี่ยวกับ git)
 
@@ -465,13 +466,9 @@ repo → Settings → Branches → Add rule: บังคับผ่าน PR �
 
 ## 10. สรุปเป็นเช็คลิสต์
 
-- [ ] 1.1 เอา secret ออกจาก `appsettings.json` + ตั้ง user-secrets + เปลี่ยนรหัส sa
 - [ ] 1.2 ตัดสินใจเรื่อง HTTPS
 - [ ] 1.3 สร้าง private repo + push
 - [ ] 2.1–2.6 VPS: IIS + Hosting Bundle + SDK + site/app pool + firewall + สิทธิ์
-- [ ] 3.1 วาง `appsettings.Production.json` บน VPS
-- [ ] 3.2 สร้าง SQL login `apppay`
-- [ ] 3.3 ปิดพอร์ต 1433 จากอินเทอร์เน็ต
 - [ ] 4.1–4.4 ติดตั้ง runner เป็น service + ให้สิทธิ์ + เห็น 🟢 Idle
 - [ ] 6 push ทดสอบ แล้วเปิดเว็บได้
 - [ ] 7 ลอง rollback ดูสักครั้งตอนยังไม่มีผู้ใช้จริง (สำคัญ — อย่ารอให้พังจริงแล้วค่อยหัดถอย)

@@ -42,7 +42,13 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// เปิดเมื่อมีใบรับรอง HTTPS แล้ว (ตั้ง "UseHttpsRedirect": true ใน appsettings)
+// บน VPS ที่มีแค่ IP ยังไม่มีโดเมน ถ้าเปิดไว้จะ redirect ไปพอร์ตที่ไม่มีใครฟัง = เว็บเปิดไม่ขึ้น
+if (app.Configuration.GetValue<bool>("UseHttpsRedirect"))
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseRouting();
 
 app.UseAuthentication();
