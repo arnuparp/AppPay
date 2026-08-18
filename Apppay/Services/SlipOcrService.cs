@@ -9,21 +9,42 @@ namespace Apppay.Services
         private static readonly string TessDataPath = Path.Combine(AppContext.BaseDirectory, "tessdata");
         private static readonly Regex AmountPattern = new(@"\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2}", RegexOptions.Compiled);
 
-        public decimal? TryReadAmount(byte[] imageBytes)
+        // ใช้ TesseractEngine ตัวเดียวประมวลผลหลายรูปในคำขอเดียว (การสร้าง engine ใหม่ทุกรูปช้ากว่ามาก)
+        public List<decimal?> TryReadAmounts(IReadOnlyList<byte[]> images)
         {
+            var results = new List<decimal?>(images.Count);
+            if (images.Count == 0) return results;
+
+            TesseractEngine? engine = null;
             try
             {
-                using var engine = new TesseractEngine(TessDataPath, "eng", EngineMode.Default);
-                using var img = Pix.LoadFromMemory(imageBytes);
-                using var page = engine.Process(img);
-                var text = page.GetText();
-                return ExtractLikelyAmount(text);
+                engine = new TesseractEngine(TessDataPath, "eng", EngineMode.Default);
             }
             catch
             {
-                // OCR ล้มเหลว (เช่น รูปไม่ใช่ภาพที่รองรับ) — ให้ผู้ใช้กรอกจำนวนเงินเอง
-                return null;
+                // เปิด engine ไม่สำเร็จ (เช่น ไม่พบ native library) — ให้ผู้ใช้กรอกจำนวนเงินเอง
+                for (var i = 0; i < images.Count; i++) results.Add(null);
+                return results;
             }
+
+            using (engine)
+            {
+                foreach (var bytes in images)
+                {
+                    try
+                    {
+                        using var img = Pix.LoadFromMemory(bytes);
+                        using var page = engine.Process(img);
+                        results.Add(ExtractLikelyAmount(page.GetText()));
+                    }
+                    catch
+                    {
+                        results.Add(null);
+                    }
+                }
+            }
+
+            return results;
         }
 
         private static decimal? ExtractLikelyAmount(string text)

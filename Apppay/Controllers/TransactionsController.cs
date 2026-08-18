@@ -236,19 +236,52 @@ namespace Apppay.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ScanSlip(IFormFile? file)
+        public async Task<IActionResult> ScanSlips(List<IFormFile>? files)
         {
-            if (file == null || file.Length == 0 || file.Length > MaxSlipFileSize)
-                return Json(new { amount = (decimal?)null });
+            var amounts = new List<decimal?>();
+            if (files == null || files.Count == 0)
+                return Json(new { amounts, total = 0m });
 
-            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-            if (!AllowedSlipExtensions.Contains(ext))
-                return Json(new { amount = (decimal?)null });
+            var imageBytesList = new List<byte[]?>();
+            foreach (var file in files)
+            {
+                if (file.Length == 0 || file.Length > MaxSlipFileSize)
+                {
+                    imageBytesList.Add(null);
+                    continue;
+                }
 
-            using var ms = new MemoryStream();
-            await file.CopyToAsync(ms);
-            var amount = _ocr.TryReadAmount(ms.ToArray());
-            return Json(new { amount });
+                var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+                if (!AllowedSlipExtensions.Contains(ext))
+                {
+                    imageBytesList.Add(null);
+                    continue;
+                }
+
+                using var ms = new MemoryStream();
+                await file.CopyToAsync(ms);
+                imageBytesList.Add(ms.ToArray());
+            }
+
+            var validBytes = imageBytesList.Where(b => b != null).Select(b => b!).ToList();
+            var readAmounts = _ocr.TryReadAmounts(validBytes);
+
+            var readIndex = 0;
+            foreach (var bytes in imageBytesList)
+            {
+                if (bytes == null)
+                {
+                    amounts.Add(null);
+                }
+                else
+                {
+                    amounts.Add(readAmounts[readIndex]);
+                    readIndex++;
+                }
+            }
+
+            var total = amounts.Where(a => a.HasValue).Sum(a => a!.Value);
+            return Json(new { amounts, total });
         }
 
         private async Task SaveSlipFilesAsync(int transactionId, List<IFormFile>? files)
