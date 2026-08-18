@@ -19,7 +19,7 @@ env:
   DOTNET_VERSION: '9.0.x'
   PUBLISH_DIR: ${{ github.workspace }}\publish
   TARGET_DIR: 'C:\inetpub\apppay'
-  HEALTH_URL: 'http://localhost/'
+  HEALTH_URL: 'http://127.0.0.1/'
 
 jobs:
   deploy:

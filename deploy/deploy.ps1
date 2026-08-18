@@ -14,7 +14,7 @@ param(
     [Parameter(Mandatory = $true)][string]$Source,
     [Parameter(Mandatory = $true)][string]$Target,
     [string]$BackupRoot = "C:\deploy\backups\apppay",
-    [string]$HealthUrl  = "http://localhost/",
+    [string]$HealthUrl  = "http://127.0.0.1/",
     [int]   $KeepBackups = 5
 )
 
@@ -36,7 +36,10 @@ if ((Get-ChildItem $Target -Force | Measure-Object).Count -gt 0) {
     Log "Backup -> $backup"
     robocopy $Target $backup /E /R:2 /W:2 /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "Backup failed (robocopy exit $LASTEXITCODE)" }
-    $hasBackup = $true
+    # Only count it as a rollback point if it holds a real previous release.
+    # On the very first deploy the folder has no web.config, and rolling back to
+    # "empty" would wipe the files we need in order to diagnose the failure.
+    $hasBackup = Test-Path (Join-Path $backup "web.config")
 }
 
 # ---------- 2) app_offline.htm makes IIS shut the app down and release file locks ----------
@@ -68,24 +71,37 @@ finally {
 }
 
 # ---------- 5) Health check: the app needs time to warm up and migrate ----------
+# Never route a loopback request through a system proxy.
+[System.Net.WebRequest]::DefaultWebProxy = $null
+
 $ok = $false
 foreach ($i in 1..12) {
     $code = $null
+    $why  = ""
     try {
-        $r = Invoke-WebRequest -Uri $HealthUrl -UseBasicParsing -TimeoutSec 15 `
-                               -MaximumRedirection 0 -ErrorAction Stop
+        # Redirects are allowed on purpose: 302 -> /Account/Login means the app is alive.
+        $r = Invoke-WebRequest -Uri $HealthUrl -UseBasicParsing -TimeoutSec 15 -ErrorAction Stop
         $code = $r.StatusCode
     } catch {
-        # A 302 to /Account/Login still means the app is alive
-        $code = $_.Exception.Response.StatusCode.value__
+        $resp = $_.Exception.Response
+        if ($resp -ne $null) { $code = [int]$resp.StatusCode }
+        $why = $_.Exception.Message
     }
     if ($code -and $code -lt 500) { $ok = $true; Log "Health OK (HTTP $code) on attempt $i"; break }
-    Log "No response yet (HTTP $code), retrying in 5s... ($i/12)"
+    if ($code) { Log "Not healthy yet (HTTP $code), retrying in 5s... ($i/12)" }
+    else       { Log "No response ($why), retrying in 5s... ($i/12)" }
     Start-Sleep -Seconds 5
 }
 
 # ---------- 6) Roll back automatically if the app never came up ----------
 if (-not $ok) {
+    # Surface whatever ASP.NET Core Module logged, so the CI log explains the failure.
+    Log "--- last 5 events from IIS AspNetCore Module V2 ---"
+    try {
+        Get-EventLog -LogName Application -Source "IIS AspNetCore Module V2" -Newest 5 -ErrorAction Stop |
+            ForEach-Object { Log "$($_.TimeGenerated) $($_.Message)" }
+    } catch { Log "(no ASP.NET Core Module events found)" }
+
     if ($hasBackup) {
         Log "!! Health check failed -> ROLLING BACK to $stamp"
         Set-Content -Path $offline -Value "<html><body>rolling back</body></html>"
